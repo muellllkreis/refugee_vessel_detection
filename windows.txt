@@ -1,0 +1,7 @@
+Window 1:
+Height: 3000 to 4500
+Width: 2500 to 5000
+
+Window 2:
+Height: 7000 to 8500
+Width: 6500 to 9000
