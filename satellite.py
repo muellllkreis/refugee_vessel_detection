@@ -4,6 +4,8 @@ from rasterio import plot
 from rasterio.enums import Resampling
 from rasterio.warp import reproject, Resampling
 from rasterio.windows import Window
+from shapely.geometry import Polygon
+from shapely import speedups
 import rasterio.features
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -17,6 +19,7 @@ def mad(data, axis=None):
     return np.mean(np.absolute(data - np.mean(data, axis)), axis)
 
 downscale_factor = 1/2
+speedups.disable()
 
 ## TCI downscaled to 20m ppx
 with rasterio.open("../tci.jp2", tiled=True, blockxsize=256, blockysize=256, num_threads='all_cpus') as dataset:
@@ -156,17 +159,36 @@ shapes = rasterio.features.shapes(vessels)
 
 print("Shapes")
 
-
 ## Plot results (TCI vs. masked image)
 fig, ((ax1, bx1, cx1), (ax2, bx2, cx2)) = plt.subplots(nrows=2, ncols=3)
 show(windows_src[0], ax=ax1, title='route 1 true color')
 for shape in shapes:
+    ##print(shape)
     coords = shape[0]['coordinates']
-    x = [i for i,j in coords[0]]
-    y = [j for i,j in coords[0]]
-    ax1.plot(x,y)
-    #x, y = shape
-    #show(x, y, ax=cx1)
+    pol = Polygon(coords[0])
+    # filter areas that are too big (e.g. islands, sandbanks, ...)
+    if(pol.area > 100):
+        continue
+    # Check if shape is close to coast (we don't care about vessels close to coasts
+    # and can rule out coast fragments like this
+    bounding_center = (int((pol.bounds[0] + pol.bounds[2])/2), int((pol.bounds[1] + pol.bounds[3])/2))
+    cols_nsew = []
+    #print(bounding_center[1], " < ", filtered_src[1][0].shape[0], " and ", bounding_center[1], " >= 0 and ", bounding_center[0] , " < " , filtered_src[1][0].shape[1], " and ", bounding_center[0], " >= 0") 
+    if(bounding_center[1] + 50 < filtered_src[0][0].shape[0] and bounding_center[1] - 50 >= 0 and bounding_center[0] < filtered_src[0][0].shape[1] and bounding_center[0] >= 0):
+        cols_nsew.append(filtered_src[0][0][(bounding_center[1] + 50), (bounding_center[0])])
+        cols_nsew.append(filtered_src[0][0][(bounding_center[1] - 50), (bounding_center[0])])
+
+    if(bounding_center[0] + 50 < filtered_src[0][0].shape[1] and bounding_center[0] - 50 >= 0 and bounding_center[1] < filtered_src[0][0].shape[0] and bounding_center[1] >= 0):
+        cols_nsew.append(filtered_src[0][0][(bounding_center[1]), (bounding_center[0] + 50)])
+        cols_nsew.append(filtered_src[0][0][(bounding_center[1]), (bounding_center[0] - 50)])
+    if(not 0 in cols_nsew):
+        x = [i for i,j in coords[0]]
+        y = [j for i,j in coords[0]]
+        ax1.plot(x,y)
+        #a = [bounding_center[0] + 50, bounding_center[0] - 50, bounding_center[0], bounding_center[0]]
+        #b = [bounding_center[1], bounding_center[1], bounding_center[1] + 50, bounding_center[1] - 50]
+        #ax1.plot(a,b)
+
 show(windows_src[1], ax=ax2, title='route 2 true color')
 show(filtered_src[0], ax=bx1, title='route 1 water filter')
 show(filtered_src[1], ax=bx2, title='route 2 water filter')
@@ -174,6 +196,7 @@ show(vessels, ax=cx1, title='route 1 vessel index')
 show(vessels_src[1], ax=cx2, title='route 2 vessel index')
 bool_arr = vessels_src[0] == filtered_src[0]
 print(np.all(bool_arr))
+print(filtered_src[0][1][1120, 1711])
 plt.show()
 
 ##print("NIR, RED")
