@@ -5,6 +5,8 @@ Machine Learning and Image Analysis (Sentinel-2 and Marine traffic APIs) to dete
 With the ongoing humanitarian crisis having reached another tragic low point a few weeks ago, when a refugee camp on the island of Lesbos in Greece burned to the ground, I thought it would be a good idea to dedicate my resources helping to solve a real-world issue and learn more about Machine Learning and the processing of sensory inputs from different sources.
 A tragically common situation that migrants boarding vessels from the African or Turkish coast of the Mediterranean Sea are facing, is having the engines of their underequipped and overcrowded vessels destroyed or taken away by some involved Marine authority and afterwards being left stranded in the middle of the sea by themselves. This is obviously an alarming and life-threatening situation for the migrants on such a vessel.
 
+Literature Survey on the Topic: [https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5877374/](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5877374/)
+
 ## Scope of the Project
 My approach to help improve this situation with digital means is the following:
 	* Fetch publicly available Satellite Imagery ([ESA’s Sentinel-2 data](https://scihub.copernicus.eu/) is an obvious and free candidate).
