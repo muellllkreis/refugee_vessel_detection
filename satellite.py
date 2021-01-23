@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import fiona
 from scipy import ndimage, misc, signal
+import ais_parse as ais
 
 import pprint
 
@@ -20,6 +21,18 @@ def mad(data, axis=None):
 
 downscale_factor = 1/2
 speedups.disable()
+
+test = rasterio.open("../tci.jp2")
+print(test.bounds)
+print("------")
+print(test.transform)
+print("------")
+print(test.crs)
+print(type(test))
+
+transforms = []
+
+testlist = ais.get_ais_info()
 
 ## TCI downscaled to 20m ppx
 with rasterio.open("../tci.jp2", tiled=True, blockxsize=256, blockysize=256, num_threads='all_cpus') as dataset:
@@ -31,6 +44,7 @@ with rasterio.open("../tci.jp2", tiled=True, blockxsize=256, blockysize=256, num
                                         int(2500 * downscale_factor)
                                        ),
                             resampling=Resampling.bilinear))
+    transforms.append(rasterio.windows.transform(Window(2500, 3000, 2500, 1500), dataset.transform))
     windows_d1.append(dataset.read(window=Window(6500, 7000, 2500, 1500),
                             out_shape=(
                                         dataset.count,
@@ -38,7 +52,19 @@ with rasterio.open("../tci.jp2", tiled=True, blockxsize=256, blockysize=256, num
                                         int(2500 * downscale_factor)
                                        ),
                             resampling=Resampling.bilinear))
+    transforms.append(rasterio.windows.transform(Window(6500, 7000, 2500, 1500), dataset.transform))
 
+
+print("-------------")
+print("Window Transform")
+print(transforms[0])
+print(type(dataset))
+print(type(windows_d1[0]))
+
+##for i, j in np.ndindex(windows_d1[0].shape[1:]):
+##    coordinatex,coordinatey = rasterio.transform.xy(transforms[0], i, j, offset='center')
+##    print ("long of result is " + str(coordinatex))
+##    print ("lat of result is " + str(coordinatey))
 
 ## MIR image with 20m ppx
 with rasterio.open("../swir.jp2", tiled=True, blockxsize=256, blockysize=256, num_threads='all_cpus') as dataset2:
@@ -189,7 +215,12 @@ for shape in shapes:
         #b = [bounding_center[1], bounding_center[1], bounding_center[1] + 50, bounding_center[1] - 50]
         #ax1.plot(a,b)
 
-show(windows_src[1], ax=ax2, title='route 2 true color')
+print("CRS:")
+print(dataset.crs)
+
+print(windows_src[1].shape)
+
+show(windows_src[1], ax=ax2, title='route 2 true color', transform=transforms[1])
 show(filtered_src[0], ax=bx1, title='route 1 water filter')
 show(filtered_src[1], ax=bx2, title='route 2 water filter')
 show(vessels, ax=cx1, title='route 1 vessel index')
