@@ -143,88 +143,89 @@ for i in range(len(windows_d1)):
     red_src.append(np.where(filtered_src[i] > 0, windows_red[i], 0))
     nir_src.append(np.where(filtered_src[i] > 0, windows_nir[i], 0))
     
-    #vi.append(windows_nir[i] - filtered_src[i][2])
     ## Calculate Vessel Index
     vi.append(nir_src[i].astype(int) - red_src[i].astype(int))
     # Max value of spectral array instead of actual value - needs to be checked
     vessels_src.append(np.where(vi[i] > 0, 6215, 0))
-    #vessels_src.append(np.where(vi[i] > 0, filtered_src[i], 0))
+
+all_shapes = []
+all_vessels = []
 
 ## Get spectral array: Sum of all 10m channels
-spectral_array = [red_src[0][0].astype(int), blue_src[0][0].astype(int), green_src[0][0].astype(int), nir_src[0][0].astype(int)]
-spectral_sum = sum(spectral_array)
+for i in range(len(windows_src)):    
+    spectral_array = [red_src[i][0].astype(int), blue_src[i][0].astype(int), green_src[i][0].astype(int), nir_src[i][0].astype(int)]
+    spectral_sum = sum(spectral_array)
 
-print(red_src[0][0][0,0], " ", blue_src[0][0][0,0], " ", green_src[0][0][0,0], " ", nir_src[0][0][0,0])
-    
-print("Spectral Sum")
-print(spectral_sum)
+    print(red_src[i][0][0,0], " ", blue_src[i][0][0,0], " ", green_src[i][0][0,0], " ", nir_src[i][0][0,0])
+        
+    print("Spectral Sum")
+    print(spectral_sum)
 
-## Add VI values to spectral array
-spectral_sum = np.where(spectral_sum < vessels_src[0], vessels_src[0], spectral_sum)
-## Perform binomial logistic regression (fit results to scale of 0 to 1)
-rescale = np.interp(spectral_sum, (spectral_sum.min(), spectral_sum.max()), (0, 1))
+    ## Add VI values to spectral array
+    spectral_sum = np.where(spectral_sum < vessels_src[i], vessels_src[i], spectral_sum)
+    ## Perform binomial logistic regression (fit results to scale of 0 to 1)
+    rescale = np.interp(spectral_sum, (spectral_sum.min(), spectral_sum.max()), (0, 1))
 
-print("Rescaling")
-print(rescale)
-print(np.amax(spectral_sum))
-print(mad(rescale))
+    print("Rescaling")
+    print(rescale)
+    print(np.amax(spectral_sum))
+    print(mad(rescale))
 
-## Calculate mean and mean absolute deviation - will serve as threshold for sea features
-meanval = np.mean(rescale)
-dev = mad(rescale)
+    ## Calculate mean and mean absolute deviation - will serve as threshold for sea features
+    meanval = np.mean(rescale)
+    dev = mad(rescale)
 
-## Use mean to create binary mask of vessels
-vessels = np.where((rescale > meanval + dev), 1, 0)
+    ## Use mean to create binary mask of vessels
+    vessels = np.where((rescale > meanval + dev), 1, 0)
 
-## Convert to float before plotting (float uses 0..1 RGB values instead of int 0..255 scale)
-vessels = vessels.astype('float32')
-vessel_mask = vessels.astype('bool')
-vessels = ndimage.median_filter(vessels, size=3)
+    ## Convert to float before plotting (float uses 0..1 RGB values instead of int 0..255 scale)
+    vessels = vessels.astype('float32')
+    vessel_mask = vessels.astype('bool')
+    all_vessels.append(ndimage.median_filter(vessels, size=3))
 
-shapes = rasterio.features.shapes(vessels)
-
-print("Shapes")
+    all_shapes.append(rasterio.features.shapes(all_vessels[i]))
 
 ## Plot results (TCI vs. masked image)
 fig, ((ax1, bx1, cx1), (ax2, bx2, cx2)) = plt.subplots(nrows=2, ncols=3)
-show(windows_src[0], ax=ax1, title='route 1 true color')
-for shape in shapes:
-    ##print(shape)
-    coords = shape[0]['coordinates']
-    pol = Polygon(coords[0])
-    # filter areas that are too big (e.g. islands, sandbanks, ...)
-    if(pol.area > 100):
-        continue
-    # Check if shape is close to coast (we don't care about vessels close to coasts
-    # and can rule out coast fragments like this
-    bounding_center = (int((pol.bounds[0] + pol.bounds[2])/2), int((pol.bounds[1] + pol.bounds[3])/2))
-    cols_nsew = []
-    #print(bounding_center[1], " < ", filtered_src[1][0].shape[0], " and ", bounding_center[1], " >= 0 and ", bounding_center[0] , " < " , filtered_src[1][0].shape[1], " and ", bounding_center[0], " >= 0") 
-    if(bounding_center[1] + 50 < filtered_src[0][0].shape[0] and bounding_center[1] - 50 >= 0 and bounding_center[0] < filtered_src[0][0].shape[1] and bounding_center[0] >= 0):
-        cols_nsew.append(filtered_src[0][0][(bounding_center[1] + 50), (bounding_center[0])])
-        cols_nsew.append(filtered_src[0][0][(bounding_center[1] - 50), (bounding_center[0])])
 
-    if(bounding_center[0] + 50 < filtered_src[0][0].shape[1] and bounding_center[0] - 50 >= 0 and bounding_center[1] < filtered_src[0][0].shape[0] and bounding_center[1] >= 0):
-        cols_nsew.append(filtered_src[0][0][(bounding_center[1]), (bounding_center[0] + 50)])
-        cols_nsew.append(filtered_src[0][0][(bounding_center[1]), (bounding_center[0] - 50)])
-    if(not 0 in cols_nsew):
-        x = [i for i,j in coords[0]]
-        y = [j for i,j in coords[0]]
-        ax1.plot(x,y)
-        #a = [bounding_center[0] + 50, bounding_center[0] - 50, bounding_center[0], bounding_center[0]]
-        #b = [bounding_center[1], bounding_center[1], bounding_center[1] + 50, bounding_center[1] - 50]
-        #ax1.plot(a,b)
+ax_dict = {0: ax1, 1: ax2}
+
+for i in range(len(windows_src)):
+    axis = ax_dict[i]
+    show(windows_src[i], ax=axis, title='route ' + str(i) + ' true color')
+    for shape in all_shapes[i]:
+        ##print(shape)
+        coords = shape[0]['coordinates']
+        pol = Polygon(coords[0])
+        # filter areas that are too big (e.g. islands, sandbanks, ...)
+        if(pol.area > 100):
+            continue
+        # Check if shape is close to coast (we don't care about vessels close to coasts
+        # and can rule out coast fragments like this
+        bounding_center = (int((pol.bounds[0] + pol.bounds[2])/2), int((pol.bounds[1] + pol.bounds[3])/2))
+        cols_nsew = []
+        if(bounding_center[1] + 50 < filtered_src[0][0].shape[0] and bounding_center[1] - 50 >= 0 and bounding_center[0] < filtered_src[i][0].shape[1] and bounding_center[0] >= 0):
+            cols_nsew.append(filtered_src[i][0][(bounding_center[1] + 50), (bounding_center[0])])
+            cols_nsew.append(filtered_src[i][0][(bounding_center[1] - 50), (bounding_center[0])])
+
+        if(bounding_center[0] + 50 < filtered_src[0][0].shape[1] and bounding_center[0] - 50 >= 0 and bounding_center[1] < filtered_src[i][0].shape[0] and bounding_center[1] >= 0):
+            cols_nsew.append(filtered_src[i][0][(bounding_center[1]), (bounding_center[0] + 50)])
+            cols_nsew.append(filtered_src[i][0][(bounding_center[1]), (bounding_center[0] - 50)])
+        if(not 0 in cols_nsew):
+            x = [i for i,j in coords[0]]
+            y = [j for i,j in coords[0]]
+            axis.plot(x,y)
 
 print("CRS:")
 print(dataset.crs)
 
 print(windows_src[1].shape)
 
-show(windows_src[1], ax=ax2, title='route 2 true color', transform=transforms[1])
+#show(windows_src[1], ax=ax2, title='route 2 true color', transform=transforms[1])
 show(filtered_src[0], ax=bx1, title='route 1 water filter')
 show(filtered_src[1], ax=bx2, title='route 2 water filter')
-show(vessels, ax=cx1, title='route 1 vessel index')
-show(vessels_src[1], ax=cx2, title='route 2 vessel index')
+show(all_vessels[0], ax=cx1, title='route 1 vessel index')
+show(all_vessels[1], ax=cx2, title='route 2 vessel index')
 bool_arr = vessels_src[0] == filtered_src[0]
 print(np.all(bool_arr))
 print(filtered_src[0][1][1120, 1711])
