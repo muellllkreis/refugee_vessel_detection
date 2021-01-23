@@ -192,13 +192,16 @@ ax_dict = {0: ax1, 1: ax2}
 
 for i in range(len(windows_src)):
     axis = ax_dict[i]
-    show(windows_src[i], ax=axis, title='route ' + str(i) + ' true color')
+    show(windows_src[i], ax=axis, title='route ' + str(i) + ' true color', transform=transforms[i])
     for shape in all_shapes[i]:
-        ##print(shape)
+        if i == 1:
+            print(shape)
         coords = shape[0]['coordinates']
         pol = Polygon(coords[0])
         # filter areas that are too big (e.g. islands, sandbanks, ...)
         if(pol.area > 100):
+            if i == 1:
+                print("filter")
             continue
         # Check if shape is close to coast (we don't care about vessels close to coasts
         # and can rule out coast fragments like this
@@ -214,7 +217,8 @@ for i in range(len(windows_src)):
         if(not 0 in cols_nsew):
             x = [i for i,j in coords[0]]
             y = [j for i,j in coords[0]]
-            axis.plot(x,y)
+            tr_x, tr_y = rasterio.transform.xy(transforms[i], y, x, offset='center')
+            axis.plot(tr_x, tr_y)
 
 print("CRS:")
 print(dataset.crs)
