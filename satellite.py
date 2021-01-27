@@ -4,7 +4,7 @@ from rasterio import plot
 from rasterio.enums import Resampling
 from rasterio.warp import reproject, Resampling
 from rasterio.windows import Window
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 from shapely import speedups
 import rasterio.features
 import matplotlib.pyplot as plt
@@ -32,7 +32,7 @@ print(type(test))
 
 transforms = []
 
-testlist = ais.get_ais_info()
+vessel_list = ais.get_ais_info()
 
 ## TCI downscaled to 20m ppx
 with rasterio.open("../tci.jp2", tiled=True, blockxsize=256, blockysize=256, num_threads='all_cpus') as dataset:
@@ -194,14 +194,10 @@ for i in range(len(windows_src)):
     axis = ax_dict[i]
     show(windows_src[i], ax=axis, title='route ' + str(i) + ' true color', transform=transforms[i])
     for shape in all_shapes[i]:
-        if i == 1:
-            print(shape)
         coords = shape[0]['coordinates']
         pol = Polygon(coords[0])
         # filter areas that are too big (e.g. islands, sandbanks, ...)
         if(pol.area > 100):
-            if i == 1:
-                print("filter")
             continue
         # Check if shape is close to coast (we don't care about vessels close to coasts
         # and can rule out coast fragments like this
@@ -218,7 +214,21 @@ for i in range(len(windows_src)):
             x = [i for i,j in coords[0]]
             y = [j for i,j in coords[0]]
             tr_x, tr_y = rasterio.transform.xy(transforms[i], y, x, offset='center')
-            axis.plot(tr_x, tr_y)
+
+            # Get translated representation of shape to test against AIS data
+            translated_coords = []
+            for n in range(len(tr_x)):
+                translated_coords.append((tr_x[n], tr_y[n]))
+
+            testpol = Polygon(translated_coords)
+            is_registered = False
+            for vessel in vessel_list:
+                if testpol.contains(Point(vessel.long, vessel.lat)):
+                    is_registered = True
+                    axis.text(vessel.long + 5, vessel.lat + 5, vessel.name, color='white', fontsize=5)
+                    axis.plot(tr_x, tr_y, color='green')
+            if not is_registered:
+                axis.plot(tr_x, tr_y, color='red')
 
 print("CRS:")
 print(dataset.crs)

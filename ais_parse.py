@@ -4,12 +4,12 @@ from datetime import datetime
 class Vessel:
     def __init__(self, name, long, lat, time):
         self.name = name
-        self.long = long
-        self.lat = lat
+        self.long = int(long)
+        self.lat = int(lat)
         self.report_time = int(time)
 
     def __str__(self):
-        return "Vessel | Name: " + self.name + "; Pos: (" + self.long + "," + self.lat + "); Last Reported: " + datetime.utcfromtimestamp(self.report_time).strftime('%Y-%m-%d %H:%M:%S')
+        return "Vessel | Name: " + self.name + "; Pos: (" + str(self.long) + "," + str(self.lat) + "); Last Reported: " + datetime.utcfromtimestamp(self.report_time).strftime('%Y-%m-%d %H:%M:%S')
 
 
 def get_ais_info():
