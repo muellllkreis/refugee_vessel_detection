@@ -4,10 +4,11 @@ from rasterio import plot
 from rasterio.enums import Resampling
 from rasterio.warp import reproject, Resampling
 from rasterio.windows import Window
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, Point, MultiPoint
 from shapely import speedups
 import rasterio.features
 import matplotlib.pyplot as plt
+from matplotlib import colors
 import pandas as pd
 import numpy as np
 import fiona
@@ -17,7 +18,7 @@ import ais_parse as ais
 import pprint
 
 def mad(data, axis=None):
-    return np.mean(np.absolute(data - np.mean(data, axis)), axis)
+    return np.nanmean(np.absolute(data - np.nanmean(data, axis)), axis)
 
 downscale_factor = 1/2
 speedups.disable()
@@ -98,6 +99,11 @@ for i in range(len(windows_src)):
     filtered_src.append(np.where(zoomed[i] == 1, windows_src[i], 0))
 
 
+windows_hsv = []
+for i in range(len(windows_d1)):
+    hsv = colors.rgb_to_hsv(windows_src[i].transpose()).transpose()
+    windows_hsv.append(np.where(filtered_src[i] > 0, hsv, 0))
+
 ## Plot results (TCI vs. masked image)
 ##fig, ((ax1, bx1), (ax2, bx2)) = plt.subplots(nrows=2, ncols=2)
 ##show(windows_src[0], ax=ax1, title='route 1 true color')
@@ -139,7 +145,7 @@ nir_src = []
 ## Apply water mask to all 10m channels (BGR, NIR)
 for i in range(len(windows_d1)):
     blue_src.append(np.where(filtered_src[i] > 0, windows_blue[i], 0))
-    green_src.append(np.where(filtered_src[i] > 0, windows_green [i], 0))
+    green_src.append(np.where(filtered_src[i] > 0, windows_green[i], 0))
     red_src.append(np.where(filtered_src[i] > 0, windows_red[i], 0))
     nir_src.append(np.where(filtered_src[i] > 0, windows_nir[i], 0))
     
@@ -191,6 +197,13 @@ fig, ((ax1, bx1, cx1), (ax2, bx2, cx2)) = plt.subplots(nrows=2, ncols=3)
 ax_dict = {0: ax1, 1: ax2}
 
 for i in range(len(windows_src)):
+    windows_hsv[i][windows_hsv[i] == 0] = np.nan
+    mean_hsv = np.nanmean(windows_hsv[i][1])
+    dev_hsv = mad(windows_hsv[i][1])
+
+    print("MEAN HSV:", mean_hsv)
+    print("DEV HSV:", dev_hsv)
+    
     axis = ax_dict[i]
     show(windows_src[i], ax=axis, title='route ' + str(i) + ' true color', transform=transforms[i])
     for shape in all_shapes[i]:
@@ -221,6 +234,25 @@ for i in range(len(windows_src)):
                 translated_coords.append((tr_x[n], tr_y[n]))
 
             testpol = Polygon(translated_coords)
+
+            ### test hsv color of polygon
+            print("--------------Shape--------------")
+            print(coords[0][0])
+            hsv_sum = 0
+            for xval, yval in coords[0]:
+                #print(xval, ", ", yval)
+                hsv_sum += windows_hsv[i][1][int(yval) - 1, int(xval) - 1]
+                #print(windows_hsv[i][1][int(yval) - 1, int(xval) - 1])
+            print("---------------------------------")
+            hsv_avg = hsv_sum / len(coords[0])
+            print(hsv_avg)
+            if(hsv_avg < mean_hsv + 0.05 and hsv_avg > mean_hsv - 0.05) or (np.isnan(hsv_avg)):
+                print("Likely water")
+                continue
+            else:
+                print("Likely something else")
+            ###
+            
             is_registered = False
             for vessel in vessel_list:
                 if testpol.contains(Point(vessel.long, vessel.lat)):
@@ -235,6 +267,7 @@ print(dataset.crs)
 
 print(windows_src[1].shape)
 
+#show(windows_hsv[0], ax=ax1, title='route 1 hsv', transform=transforms[0])
 #show(windows_src[1], ax=ax2, title='route 2 true color', transform=transforms[1])
 show(filtered_src[0], ax=bx1, title='route 1 water filter')
 show(filtered_src[1], ax=bx2, title='route 2 water filter')
